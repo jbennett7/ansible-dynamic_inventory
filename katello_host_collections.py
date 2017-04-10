@@ -54,9 +54,7 @@ class KatelloHostCollection(object):
         return result.json()['facts']['network::hostname']
 
     def get_host_collection(self,host_collection):
-
         host_collections = self._get_host_collections_list()
-
         inventory = []
         for hc in host_collections:
             if hc['name'] == host_colleciton:
