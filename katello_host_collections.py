@@ -32,7 +32,7 @@ class KatelloHostCollection(object):
         if self.args.list:
             self.inventory = self.get_host_collection()
         else:
-            self.inventory = {}
+            self.inventory = self._empty_inventory()
 
         print json.dumps(self.inventory)
 
@@ -65,18 +65,22 @@ class KatelloHostCollection(object):
         return result.json()['facts']['network::hostname']
 
     def get_host_collection(self):
-        host_collections = self._get_host_collections_list()
+        host_collection = self._get_host_collections_list()
         inventory = []
-        for hc in host_collections:
-            if hc['name'] == self.host_colleciton:
+        data = self._empty_inventory()
+        for hc in host_collection:
+            if hc['name'] == self.host_collection:
                 for host_id in self._get_host_collection(hc['id']):
-                    inventory.append(self._get_hostname(host_id))
-
-        return { host_collection: inventory }
+                    hostname = self._get_hostname(host_id)
+                    inventory.append(hostname)
+                    data['_meta']['hostvars'][hostname] = {}
+        data[self.host_collection] = inventory
+        return data
 
     def read_cli_args(self):
         parser = argparse.ArgumentParser()
         parser.add_argument('--list', action='store_true')
+        parser.add_argument('--host', action='store')
         self.args = parser.parse_args()
 
     def read_settings(self):
