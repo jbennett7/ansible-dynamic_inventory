@@ -37,10 +37,11 @@ class KatelloHostCollection(object):
         print json.dumps(self.inventory)
 
     def _get_host_collections_list(self):
-        url="%s/organizations/1/host_collections" % self.katello_base_url
+        url="%s/organizations/1/host_collections?per_page=1000" % self.katello_base_url
         result = requests.get(url, auth=(self.username,self.password))
         if result.status_code != 200:
-            raise ValueError("ERROR: %s returned status code: %s" % (sys._getframe().f_code.co_name, result.status_code))
+            raise ValueError("ERROR: %s returned status code: %s" % 
+                (sys._getframe().f_code.co_name, result.status_code))
 
         hc_list = []
         for hc in result.json()['results']:
@@ -52,7 +53,8 @@ class KatelloHostCollection(object):
         url="%s/host_collections/%s" % (self.katello_base_url,str(hc_id))
         result = requests.get(url, auth=(self.username,self.password))
         if result.status_code != 200:
-            raise ValueError("ERROR: %s returned status code: %s" % (sys._getframe().f_code.co_name, result.status_code))
+            raise ValueError("ERROR: %s returned status code: %s" % 
+                (sys._getframe().f_code.co_name, result.status_code))
 
         return result.json()['host_ids']
 
@@ -60,21 +62,24 @@ class KatelloHostCollection(object):
         url="%s/hosts/%s" % (self.foreman_base_url, str(host_id))
         result = requests.get(url, auth=(self.username,self.password))
         if result.status_code != 200:
-            raise ValueError("ERROR: %s returned status code: %s" % (sys._getframe().f_code.co_name, result.status_code))
+            raise ValueError("ERROR: %s returned status code: %s" % 
+                (sys._getframe().f_code.co_name, result.status_code))
 
         return result.json()['facts']['network::hostname']
 
     def get_host_collection(self):
-        host_collection = self._get_host_collections_list()
-        inventory = []
         data = self._empty_inventory()
-        for hc in host_collection:
-            if hc['name'] == self.host_collection:
-                for host_id in self._get_host_collection(hc['id']):
-                    hostname = self._get_hostname(host_id)
-                    inventory.append(hostname)
-                    data['_meta']['hostvars'][hostname] = {}
-        data[self.host_collection] = inventory
+        for hc_name in self.host_collections:
+            host_collection = self._get_host_collections_list()
+            for hc in host_collection:
+                inventory = []
+                if hc['name'] == hc_name:
+                    hc_list = self._get_host_collection(hc['id'])
+                    for host_id in hc_list:
+                        hostname = self._get_hostname(host_id)
+                        inventory.append(hostname)
+                        data['_meta']['hostvars'][hostname] = {}
+                    data[hc['name']] = inventory
         return data
 
     def read_cli_args(self):
@@ -91,7 +96,7 @@ class KatelloHostCollection(object):
         self.hostname = hostname
         self.username = username
         self.password = password
-        self.host_collection = host_collection
+        self.host_collections = host_collection.split(',')
 
         if config.has_option('default', 'hostname'):
             self.hostname = config.get('default', 'hostname')
@@ -100,7 +105,7 @@ class KatelloHostCollection(object):
         if config.has_option('default', 'password'):
             self.password = config.get('default', 'password')
         if config.has_option('default', 'host_collection'):
-            self.host_collection = config.get('default','host_collection')
+            self.host_collections = config.get('default','host_collection').split(',')
 
 if __name__ == '__main__':
     KatelloHostCollection()
