@@ -11,11 +11,8 @@ try:
 except ImportError:
     import simplejson as json
 
-hostname='host.example.com'
-username='admin'
-password='password'
-host_collection='myhostcollection'
 katello_ini='katello.ini'
+param_list=['hostname', 'username', 'password', 'host_collections']
 
 class KatelloHostCollection(object):
     def _empty_inventory(self):
@@ -40,7 +37,7 @@ class KatelloHostCollection(object):
         url="%s/organizations/1/host_collections?per_page=1000" % self.katello_base_url
         result = requests.get(url, auth=(self.username,self.password))
         if result.status_code != 200:
-            raise ValueError("ERROR: %s returned status code: %s" % 
+            raise KatelloReturnCodeError("ERROR: %s returned status code: %s" % 
                 (sys._getframe().f_code.co_name, result.status_code))
 
         hc_list = []
@@ -53,7 +50,7 @@ class KatelloHostCollection(object):
         url="%s/host_collections/%s" % (self.katello_base_url,str(hc_id))
         result = requests.get(url, auth=(self.username,self.password))
         if result.status_code != 200:
-            raise ValueError("ERROR: %s returned status code: %s" % 
+            raise KatelloReturnCodeError("ERROR: %s returned status code: %s" % 
                 (sys._getframe().f_code.co_name, result.status_code))
 
         return result.json()['host_ids']
@@ -62,7 +59,7 @@ class KatelloHostCollection(object):
         url="%s/hosts/%s" % (self.foreman_base_url, str(host_id))
         result = requests.get(url, auth=(self.username,self.password))
         if result.status_code != 200:
-            raise ValueError("ERROR: %s returned status code: %s" % 
+            raise KatelloReturnCodeError("ERROR: %s returned status code: %s" % 
                 (sys._getframe().f_code.co_name, result.status_code))
 
         return result.json()['facts']['network::hostname']
@@ -89,23 +86,25 @@ class KatelloHostCollection(object):
         self.args = parser.parse_args()
 
     def read_settings(self):
-
         config = ConfigParser.SafeConfigParser()
         ini_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), katello_ini )
         config.read(ini_path)
-        self.hostname = hostname
-        self.username = username
-        self.password = password
-        self.host_collections = host_collection.split(',')
+        section = 'default'
 
-        if config.has_option('default', 'hostname'):
-            self.hostname = config.get('default', 'hostname')
-        if config.has_option('default', 'username'):
-            self.username = config.get('default', 'username')
-        if config.has_option('default', 'password'):
-            self.password = config.get('default', 'password')
-        if config.has_option('default', 'host_collection'):
-            self.host_collections = config.get('default','host_collection').split(',')
+        for param in param_list:
+            if config.has_option( section, param):
+                if param == 'host_collections':
+                    setattr(self, param, config.get( section, param).split(','))
+                else:
+                    setattr(self, param, config.get(section, param))
+            else:
+                raise ConfigParser.NoOptionError(param,section)
+
+class KatelloReturnCodeError(Exception):
+    def __init__(self,value):
+        self.value = value
+    def __str__(self):
+        return repr(self.value)
 
 if __name__ == '__main__':
     KatelloHostCollection()
